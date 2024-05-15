@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torchvision.models
 import clip
+import open_clip
 
 
 def clip_imageencoder(name):
@@ -11,6 +12,12 @@ def clip_imageencoder(name):
     imageencoder = model.visual
 
     return imageencoder
+
+def openclip_imageencoder(name):
+    model, _, preprocess = open_clip.create_model_and_transforms(name, device="cpu", pretrained='laion400m_e32')
+    imageencoder = model.visual
+    return imageencoder
+
 
 
 class Identity(nn.Module):
@@ -81,6 +88,10 @@ def get_backbone(name, preserve_readout, pretrained):
     elif name == "clip_vit-b16":
         network = clip_imageencoder("ViT-B/16")
         n_outputs = network.output_dim
+    elif name == "openclip_vit-b16":
+        network = openclip_imageencoder("ViT-B-16")
+        n_outputs = network.output_dim
+
     elif name == "swag_regnety_16gf":
         # No readout layer as default
         network = torchhub_load("facebookresearch/swag", model="regnety_16gf", pretrained=pretrained)

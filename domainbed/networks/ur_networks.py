@@ -27,6 +27,14 @@ BLOCKNAMES = {
         "block3": ["transformer.resblocks.6", "transformer.resblocks.7", "transformer.resblocks.8"],
         "block4": ["transformer.resblocks.9", "transformer.resblocks.10", "transformer.resblocks.11"],
     },
+    "openclipvit": {  # vit-base
+        "stem": ["conv1"],
+        "block1": ["transformer.resblocks.0", "transformer.resblocks.1", "transformer.resblocks.2"],
+        "block2": ["transformer.resblocks.3", "transformer.resblocks.4", "transformer.resblocks.5"],
+        "block3": ["transformer.resblocks.6", "transformer.resblocks.7", "transformer.resblocks.8"],
+        "block4": ["transformer.resblocks.9", "transformer.resblocks.10", "transformer.resblocks.11"],
+    },
+
     "regnety": {
         "stem": ["stem"],
         "block1": ["trunk_output.block1"],
@@ -82,6 +90,8 @@ class URResNet(torch.nn.Module):
             block_names = BLOCKNAMES["clipresnet"]
         elif hparams.model.startswith("clip_vit"):
             block_names = BLOCKNAMES["clipvit"]
+        elif hparams.model.startswith("openclip_vit"):
+            block_names = BLOCKNAMES["openclipvit"]
         elif hparams.model == "swag_regnety_16gf":
             block_names = BLOCKNAMES["regnety"]
         elif hparams.model.startswith("vit"):

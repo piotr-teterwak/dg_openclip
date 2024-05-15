@@ -105,6 +105,8 @@ class MIRO(Algorithm):
             weight_decay=self.hparams["weight_decay"],
         )
 
+        self.best_val_acc = 0.0
+
     def update(self, x, y, **kwargs):
         all_x = torch.cat(x)
         all_y = torch.cat(y)

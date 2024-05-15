@@ -174,6 +174,13 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
             # merge results
             results.update(summaries)
             results.update(accuracies)
+            val_accurracy_keys = [k.split('_')[0] for k in accuracies.keys()]
+            val_accuracy_keys = ['{}_out'.format(k) for k in val_accurracy_keys if str(test_envs[0]) not in k]
+            val_accuracy = np.mean([accuracies[k] for k in val_accuracy_keys])
+            is_best = False
+            if val_accuracy > algorithm.best_val_acc:
+                algorithm.best_val_acc = val_accuracy
+                is_best = True
 
             # print
             if results_keys != last_results_keys:
@@ -193,15 +200,15 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
             writer.add_scalars_with_prefix(summaries, step, f"{testenv_name}/summary/")
             writer.add_scalars_with_prefix(accuracies, step, f"{testenv_name}/all/")
 
-            if args.model_save and step >= args.model_save:
+            if is_best:
                 ckpt_dir = args.out_dir / "checkpoints"
                 ckpt_dir.mkdir(exist_ok=True)
 
                 test_env_str = ",".join(map(str, test_envs))
-                filename = "TE{}_{}.pth".format(test_env_str, step)
+                filename = "TE{}_best.pth".format(test_env_str)
                 if len(test_envs) > 1 and target_env is not None:
                     train_env_str = ",".join(map(str, train_envs))
-                    filename = f"TE{target_env}_TR{train_env_str}_{step}.pth"
+                    filename = f"TE{target_env}_TR{train_env_str}_best.pth"
                 path = ckpt_dir / filename
 
                 save_dict = {

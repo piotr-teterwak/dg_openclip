@@ -143,6 +143,11 @@ def main():
 
     if not args.test_envs:
         args.test_envs = [[te] for te in range(len(dataset))]
+    else:
+        if isinstance(args.test_envs,list):
+            args.test_envs = [[x] for x in args.test_envs]
+        elif isinstance(args.test_envs, int):
+            args.test_envs = [[args.test_envs]]
     logger.info(f"Target test envs = {args.test_envs}")
 
     ###########################################################################
