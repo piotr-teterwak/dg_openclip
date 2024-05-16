@@ -6,7 +6,7 @@ from domainbed.lib import misc
 from domainbed.datasets import transforms as DBT
 
 
-def set_transfroms(dset, data_type, hparams, algorithm_class=None):
+def set_transfroms(dset, data_type, hparams, dataset_name, algorithm_class=None):
     """
     Args:
         data_type: ['train', 'valid', 'test', 'mnist']
@@ -15,7 +15,10 @@ def set_transfroms(dset, data_type, hparams, algorithm_class=None):
 
     additional_data = False
     if data_type == "train":
-        dset.transforms = {"x": DBT.aug}
+        if dataset_name == "WILDSFMoW":
+            dset.transforms = {"x": DBT.fmow_aug}
+        else:
+            dset.transforms = {"x": DBT.aug}
         additional_data = True
     elif data_type == "valid":
         if hparams["val_augment"] is False:
@@ -41,7 +44,10 @@ def set_transfroms(dset, data_type, hparams, algorithm_class=None):
 def get_dataset(test_envs, args, hparams, algorithm_class=None):
     """Get dataset and split."""
     is_mnist = "MNIST" in args.dataset
-    dataset = vars(datasets)[args.dataset](args.data_dir)
+    if "WILDSFMoW" in args.dataset:
+        dataset = vars(datasets)[args.dataset](args.data_dir, test_envs=test_envs, hparams=hparams)
+    else:
+        dataset = vars(datasets)[args.dataset](args.data_dir)
     #  if not isinstance(dataset, MultipleEnvironmentImageFolder):
     #      raise ValueError("SMALL image datasets are not implemented (corrupted), for transform.")
 
@@ -67,8 +73,8 @@ def get_dataset(test_envs, args, hparams, algorithm_class=None):
             in_type = "mnist"
             out_type = "mnist"
 
-        set_transfroms(in_, in_type, hparams, algorithm_class)
-        set_transfroms(out, out_type, hparams, algorithm_class)
+        set_transfroms(in_, in_type, hparams, args.dataset, algorithm_class)
+        set_transfroms(out, out_type, hparams, args.dataset, algorithm_class)
 
         if hparams["class_balanced"]:
             in_weights = misc.make_weights_for_balanced_classes(in_)
