@@ -24,6 +24,7 @@ def main():
     parser.add_argument("name", type=str)
     parser.add_argument("configs", nargs="*")
     parser.add_argument("--data_dir", type=str, default="datadir/")
+    parser.add_argument("--resume_path", type=str, default="checkpoints/")
     parser.add_argument("--dataset", type=str, default="PACS")
     parser.add_argument("--algorithm", type=str, default="ERM")
     parser.add_argument(
@@ -49,6 +50,7 @@ def main():
     parser.add_argument("--tb_freq", default=10)
     parser.add_argument("--debug", action="store_true", help="Run w/ debug mode")
     parser.add_argument("--show", action="store_true", help="Show args and hparams w/o run")
+    parser.add_argument("--evaluate", action="store_true", help="Evaluate")
     parser.add_argument(
         "--evalmode",
         default="fast",
@@ -65,6 +67,9 @@ def main():
     keys = [open(key, encoding="utf8") for key in keys]
     hparams = Config(*keys, default=hparams)
     hparams.argv_update(left_argv)
+
+    if args.evaluate:
+        hparams['batch_size'] = 1
 
     # setup debug
     if args.debug:
@@ -177,13 +182,13 @@ def main():
     logger.info("Out path: %s" % args.out_dir)
     logger.info("Algorithm: %s" % args.algorithm)
     logger.info("Dataset: %s" % args.dataset)
-
-    table = PrettyTable(["Selection"] + dataset.environments + ["Avg."])
-    for key, row in results.items():
-        row.append(np.mean(row))
-        row = [f"{acc:.3%}" for acc in row]
-        table.add_row([key] + row)
-    logger.nofmt(table)
+    if not args.evaluate:
+         table = PrettyTable(["Selection"] + dataset.environments + ["Avg."])
+         for key, row in results.items():
+             row.append(np.mean(row))
+             row = [f"{acc:.3%}" for acc in row]
+             table.add_row([key] + row)
+         logger.nofmt(table)
 
 
 if __name__ == "__main__":

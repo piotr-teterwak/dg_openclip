@@ -46,6 +46,7 @@ class Algorithm(torch.nn.Module):
         self.num_classes = num_classes
         self.num_domains = num_domains
         self.hparams = hparams
+        self.best_val_acc = 0.0
 
     def update(self, x, y, **kwargs):
         """

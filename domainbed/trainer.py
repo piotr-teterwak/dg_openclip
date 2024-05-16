@@ -135,6 +135,51 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
     records = []
     epochs_path = args.out_dir / "results.jsonl"
 
+    if args.evaluate:
+
+        checkpoint = torch.load(args.resume_path)
+        if swad:
+            algorithm = swa_utils.AveragedModel(algorithm)
+        algorithm.load_state_dict(checkpoint['model_dict'])
+        #in_key = "train_out"
+        #tr_val_best_indomain = records.argmax("train_out")[in_key]
+
+        #ret = {
+
+        #  "test-domain validation": te_val_best,
+        #"training-domain validation": tr_val_best,
+        #  "last": last,
+        #  "last (inD)": last_indomain,
+        #  "training-domain validation (inD)": tr_val_best_indomain,
+        #}
+
+
+
+        # swad_algorithm = swad.get_final_model()
+        # if hparams["freeze_bn"] is False:
+        #     n_steps = 500 if not args.debug else 10
+        #     logger.warning(f"Update SWAD BN statistics for {n_steps} steps ...")
+        #     swa_utils.update_bn(train_minibatches_iterator, swad_algorithm, n_steps)
+
+        # logger.warning("Evaluate SWAD ...")
+        accuracies, summaries = evaluator.evaluate(algorithm)
+        results = {**summaries, **accuracies}
+        results_keys = list(summaries.keys()) + sorted(accuracies.keys()) + list(results.keys())
+        row = misc.to_row([results[key] for key in results_keys if key in results])
+        logger.info(row)
+
+        #ret["SWAD"] = results["test_in"]
+        #ret["SWAD (inD)"] = results[in_key]
+        ret = {}
+        ret['OOD'] = results["test_in"]
+        ret['ID'] = results["train_out"]
+
+        for k, acc in ret.items():
+            logger.info(f"{k} = {acc:.3%}")
+
+
+        return ret, records
+
     for step in range(n_steps):
         step_start_time = time.time()
         # batches_dictlist: [{env0_data_key: tensor, env0_...}, env1_..., ...]
@@ -211,6 +256,7 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
                     filename = f"TE{target_env}_TR{train_env_str}_best.pth"
                 path = ckpt_dir / filename
 
+
                 save_dict = {
                     "args": vars(args),
                     "model_hparams": dict(hparams),
@@ -283,6 +329,25 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
 
         ret["SWAD"] = results["test_in"]
         ret["SWAD (inD)"] = results[in_key]
+
+        ckpt_dir = args.out_dir / "checkpoints"
+        ckpt_dir.mkdir(exist_ok=True)
+
+        test_env_str = ",".join(map(str, test_envs))
+        filename = "TE{}_best.pth".format(test_env_str)
+        if len(test_envs) > 1 and target_env is not None:
+            train_env_str = ",".join(map(str, train_envs))
+            filename = f"TE{target_env}_TR{train_env_str}_best.pth"
+        path = ckpt_dir / filename
+
+
+        save_dict = {
+            "args": vars(args),
+            "model_hparams": dict(hparams),
+            "test_envs": test_envs,
+            "model_dict": swad_algorithm.cpu().state_dict(),
+        }
+        torch.save(save_dict, path)
 
     for k, acc in ret.items():
         logger.info(f"{k} = {acc:.3%}")
