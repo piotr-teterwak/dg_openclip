@@ -24,6 +24,7 @@ from domainbed.models.resnet_mixstyle2 import (
     resnet50_mixstyle2_L234_p0d5_a0d1,
 )
 
+from domainbed.sagm import SAGM, LinearScheduler
 
 def to_minibatch(x, y):
     minibatches = list(zip(x, y))
@@ -108,6 +109,57 @@ class ERM(Algorithm):
 
     def predict(self, x):
         return self.network(x)
+
+
+class SAGM_DG(Algorithm):
+    """
+    Empirical Risk Minimization (ERM)
+    """
+
+    # def __init__(self, input_shape, num_classes, num_domains, hparams):
+    #     assert input_shape[1:3] == (224, 224), "Mixstyle support R18 and R50 only"
+    #     super().__init__(input_shape, num_classes, num_domains, hparams)
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        super().__init__(input_shape, num_classes, num_domains, hparams)
+        self.featurizer = networks.Featurizer(input_shape, self.hparams)
+        self.classifier = nn.Linear(self.featurizer.n_outputs, num_classes)
+        self.network = nn.Sequential(self.featurizer, self.classifier)
+        self.optimizer = get_optimizer(
+            hparams["optimizer"],
+            self.network.parameters(),
+            lr=self.hparams["lr"],
+            weight_decay=self.hparams["weight_decay"],
+        )
+
+        self.lr_scheduler = LinearScheduler(T_max=5000, max_value=self.hparams["lr"],
+                                    min_value=self.hparams["lr"], optimizer=self.optimizer)
+
+        self.rho_scheduler = LinearScheduler(T_max=5000, max_value=0.05,
+                                         min_value=0.05)
+
+        self.SAGM_optimizer = SAGM(params=self.network.parameters(), base_optimizer=self.optimizer, model=self.network,
+                               alpha=self.hparams["alpha"], rho_scheduler=self.rho_scheduler, adaptive=False)
+
+    def update(self, x, y, **kwargs):
+        all_x = torch.cat(x)
+        all_y = torch.cat(y)
+
+        def loss_fn(predictions, targets):
+            return F.cross_entropy(predictions, targets)
+
+        self.SAGM_optimizer.set_closure(loss_fn, all_x, all_y)
+        predictions, loss = self.SAGM_optimizer.step()
+        self.lr_scheduler.step()
+        self.SAGM_optimizer.update_rho_t()
+
+
+        return {"loss": loss.item()}
+
+    def predict(self, x):
+        return self.network(x)
+
+
+
 
 
 class Mixstyle(Algorithm):

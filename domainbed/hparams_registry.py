@@ -89,6 +89,11 @@ def _hparams(algorithm, dataset, random_state):
         )
     elif algorithm == "SAM":
         hparams["rho"] = (0.05, random_state.choice([0.01, 0.02, 0.05, 0.1]))
+
+ #
+    elif algorithm == "SAGM_DG":
+        hparams["rho"] = (0.05, random_state.choice([0.01, 0.02, 0.05, 0.1]))
+        hparams["alpha"] = (0.001, random_state.choice([0.01, 0.02, 0.05, 0.1]))
     elif algorithm == "CutMix":
         hparams["beta"] = (1.0, 1.0)
         # cutmix_prob is set to 1.0 for ImageNet and 0.5 for CIFAR100 in the original paper.
