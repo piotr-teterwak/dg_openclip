@@ -81,7 +81,12 @@ class MIRO(Algorithm):
         )
         self.classifier = nn.Linear(self.featurizer.n_outputs, num_classes)
         self.network = nn.Sequential(self.featurizer, self.classifier)
+
+        linear_parameters = []
+        for n, p in self.network[1].named_parameters():
+            linear_parameters.append(p)
         self.ld = hparams.ld
+        self.global_iter = 0
 
         # build mean/var encoders
         shapes = get_shapes(self.pre_featurizer, self.input_shape)
@@ -98,9 +103,17 @@ class MIRO(Algorithm):
             {"params": self.mean_encoders.parameters(), "lr": hparams.lr * hparams.lr_mult},
             {"params": self.var_encoders.parameters(), "lr": hparams.lr * hparams.lr_mult},
         ]
+
         self.optimizer = get_optimizer(
             hparams["optimizer"],
             parameters,
+            lr=self.hparams["lr"],
+            weight_decay=self.hparams["weight_decay"],
+        )
+
+        self.linear_optimizer = get_optimizer(
+            hparams["optimizer"],
+            linear_parameters,
             lr=self.hparams["lr"],
             weight_decay=self.hparams["weight_decay"],
         )
@@ -112,6 +125,15 @@ class MIRO(Algorithm):
         feat, inter_feats = self.featurizer(all_x, ret_feats=True)
         logit = self.classifier(feat)
         loss = F.cross_entropy(logit, all_y)
+
+
+        if self.global_iter > self.hparams["linear_steps"]:
+            selected_optimizer = self.optimizer
+        else:
+            selected_optimizer = self.linear_optimizer
+
+        if self.global_iter == self.hparams["linear_steps"] + 1:
+            print('SWITCHING OPTIMIZERS')
 
         # MIRO
         with torch.no_grad():
@@ -129,9 +151,10 @@ class MIRO(Algorithm):
 
         loss += reg_loss * self.ld
 
-        self.optimizer.zero_grad()
+        selected_optimizer.zero_grad()
         loss.backward()
-        self.optimizer.step()
+        selected_optimizer.step()
+        self.global_iter += 1
 
         return {"loss": loss.item(), "reg_loss": reg_loss.item()}
 

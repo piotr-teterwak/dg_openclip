@@ -51,6 +51,7 @@ def main():
     parser.add_argument("--debug", action="store_true", help="Run w/ debug mode")
     parser.add_argument("--show", action="store_true", help="Show args and hparams w/o run")
     parser.add_argument("--evaluate", action="store_true", help="Evaluate")
+    parser.add_argument("--warmup", action="store_true", help="Warmup")
     parser.add_argument(
         "--evalmode",
         default="fast",
@@ -70,6 +71,9 @@ def main():
 
     if args.evaluate:
         hparams['batch_size'] = 1
+
+    if args.warmup:
+        hparams['linear_steps'] = 500
 
     # setup debug
     if args.debug:
