@@ -12,6 +12,42 @@ class SWADBase:
         raise NotImplementedError()
 
 
+
+
+class SecondStage(SWADBase):
+    """SWAD start from iid max acc and select last by iid max swa acc"""
+
+    def __init__(self, evaluator, start_step, end_step, first_stage_converged, **kwargs):
+        self.start_step = start_step
+        self.end_step = end_step
+        self.first_stage_converged = first_stage_converged
+        self.avgmodel = None
+        self.final_model = None
+        self.evaluator = evaluator
+
+    def update_and_evaluate(self, segment_swa, prt_fun):
+        if self.first_stage_converged:
+             if segment_swa.start_step <= self.start_step:
+                 self.avgmodel = swa_utils.AveragedModel(segment_swa.module, rm_optimizer=True)
+                 self.avgmodel.start_step = segment_swa.start_step
+
+             self.avgmodel.update_parameters(segment_swa.module)
+             self.avgmodel.end_step = segment_swa.end_step
+
+             # evaluate
+             accuracies, summaries = self.evaluator.evaluate(self.avgmodel)
+             results = {**summaries, **accuracies}
+             prt_fn(results, self.avgmodel)
+
+             if segment_swa.last_step <= self.end_step:
+                 self.final_model = copy.deepcopy(self.avgmodel)
+        else:
+            self.final_model = swa_utils.AveragedModel(segment_swa.module, rm_optimizer=True)
+
+    def get_final_model(self):
+        return self.final_model
+
+
 class IIDMax(SWADBase):
     """SWAD start from iid max acc and select last by iid max swa acc"""
 
