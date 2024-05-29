@@ -11,6 +11,37 @@ class SWADBase:
     def get_final_model(self):
         raise NotImplementedError()
 
+class MPA(SWADBase):
+    """SWAD start from iid max acc and select last by iid max swa acc"""
+
+    def __init__(self, evaluator,  **kwargs):
+        self.start_step = 600
+        self.swad_max_acc = 0.0
+        self.avgmodel = None
+        self.final_model = None
+        self.evaluator = evaluator
+
+    def update_and_evaluate(self, segment_swa, val_acc, val_loss, prt_fn):
+        if segment_swa.start_step <= self.start_step:
+            self.avgmodel = swa_utils.AveragedModel(segment_swa.module, rm_optimizer=True)
+            self.avgmodel.start_step = segment_swa.start_step
+
+        self.avgmodel.update_parameters(segment_swa.module)
+        self.avgmodel.end_step = segment_swa.end_step
+
+        # evaluate
+        accuracies, summaries = self.evaluator.evaluate(self.avgmodel)
+        results = {**summaries, **accuracies}
+        prt_fn(results, self.avgmodel)
+
+        swa_val_acc = results["train_out"]
+        if swa_val_acc > self.swa_max_acc:
+            self.swa_max_acc = swa_val_acc
+            self.final_model = copy.deepcopy(self.avgmodel)
+
+
+    def get_final_model(self):
+        return self.final_model
 
 
 

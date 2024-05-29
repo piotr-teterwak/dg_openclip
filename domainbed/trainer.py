@@ -130,7 +130,10 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
     swad = None
     if hparams["swad"]:
         swad_algorithm = swa_utils.AveragedModel(algorithm)
-        swad_cls = getattr(swad_module, "LossValley")
+        if args.mpa:
+            swad_cls = getattr(swad_module, "MPA")
+        else:
+            swad_cls = getattr(swad_module, "LossValley")
         swad = swad_cls(evaluator, **hparams.swad_kwargs)
 
     last_results_keys = None
