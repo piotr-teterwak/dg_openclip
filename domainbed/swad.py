@@ -25,7 +25,7 @@ class SecondStage(SWADBase):
         self.final_model = None
         self.evaluator = evaluator
 
-    def update_and_evaluate(self, segment_swa, prt_fun):
+    def update_and_evaluate(self, segment_swa, prt_fn):
         if self.first_stage_converged:
              if segment_swa.start_step <= self.start_step:
                  self.avgmodel = swa_utils.AveragedModel(segment_swa.module, rm_optimizer=True)
@@ -39,7 +39,7 @@ class SecondStage(SWADBase):
              results = {**summaries, **accuracies}
              prt_fn(results, self.avgmodel)
 
-             if segment_swa.last_step <= self.end_step:
+             if segment_swa.end_step <= self.end_step:
                  self.final_model = copy.deepcopy(self.avgmodel)
         else:
             self.final_model = swa_utils.AveragedModel(segment_swa.module, rm_optimizer=True)

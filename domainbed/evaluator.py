@@ -1,3 +1,6 @@
+import open_clip
+import os
+import numpy as np
 import collections
 import torch
 import torch.nn as nn
@@ -10,7 +13,7 @@ else:
     device = "cpu"
 
 
-def accuracy_from_loader(algorithm, loader, weights, debug=False):
+def accuracy_from_loader(algorithm, loader, weights, debug=False, dump_scores=False, out_dir = None, inout=None, is_test=None):
     correct = 0
     total = 0
     losssum = 0.0
@@ -18,9 +21,27 @@ def accuracy_from_loader(algorithm, loader, weights, debug=False):
 
     algorithm.eval()
 
+    dump_scores = dump_scores and is_test
+
+    if dump_scores:
+        clip_scorer, _, _ = open_clip.create_model_and_transforms('ViT-B-16', pretrained='laion400m_e32')
+        clip_scorer = clip_scorer.cuda()
+        tokenizer = open_clip.get_tokenizer('ViT-B-16')
+        similarity_clip_histogram = []
+
     for i, batch in enumerate(loader):
         x = batch["x"].to(device)
         y = batch["y"].to(device)
+
+        if dump_scores:
+            with torch.no_grad():
+                 classname = 'A photo of {}.'.format(loader._infinite_iterator._dataset.underlying_dataset.classes[y])
+                 visual_feats = clip_scorer.encode_image(x)
+                 txt = tokenizer(classname).cuda()
+                 txt_feats = clip_scorer.encode_text(txt)
+                 visual_feats = F.normalize(visual_feats, dim=-1)
+                 txt_feats = F.normalize(txt_feats, dim=-1)
+                 similarity = visual_feats @ txt_feats.T
 
         with torch.no_grad():
             logits = algorithm.predict(x)
@@ -36,18 +57,30 @@ def accuracy_from_loader(algorithm, loader, weights, debug=False):
             weights_offset += len(x)
         batch_weights = batch_weights.to(device)
         if logits.size(1) == 1:
-            correct += (logits.gt(0).eq(y).float() * batch_weights).sum().item()
+            is_correct = (logits.gt(0).eq(y).float() * batch_weights).sum().item()
+            correct += is_correct
         else:
-            correct += (logits.argmax(1).eq(y).float() * batch_weights).sum().item()
+            is_correct = (logits.argmax(1).eq(y).float() * batch_weights).sum().item()
+            correct += is_correct
         total += batch_weights.sum().item()
-
         if debug:
             break
+
+        if dump_scores:
+            similarity_clip_histogram.append((similarity.item(),is_correct))
 
     algorithm.train()
 
     acc = correct / total
     loss = losssum / total
+    if dump_scores:
+        data_domain_path = loader._infinite_iterator._dataset.underlying_dataset.root.split('/')[-1]
+
+        data_path = os.path.join(out_dir, 'similarity_np')
+        path = os.path.join(data_path, data_domain_path + '_' + inout)
+        os.makedirs(data_path, exist_ok=True)
+        np.save(path, similarity_clip_histogram)
+
     return acc, loss
 
 
@@ -64,16 +97,20 @@ def accuracy(algorithm, loader_kwargs, weights, **kwargs):
 class Evaluator:
     def __init__(
         self, test_envs, eval_meta, n_envs, logger, evalmode="fast", debug=False, target_env=None
-    ):
+    , dump_scores=False, out_dir = None):
         all_envs = list(range(n_envs))
         train_envs = sorted(set(all_envs) - set(test_envs))
         self.test_envs = test_envs
+        if self.test_envs == 'id':
+            self.test_envs = []
         self.train_envs = train_envs
         self.eval_meta = eval_meta
         self.n_envs = n_envs
         self.logger = logger
         self.evalmode = evalmode
         self.debug = debug
+        self.dump_scores = dump_scores
+        self.out_dir = out_dir
 
         if target_env is not None:
             self.set_target_env(target_env)
@@ -85,7 +122,7 @@ class Evaluator:
     def evaluate(self, algorithm, ret_losses=False):
         n_train_envs = len(self.train_envs)
         n_test_envs = len(self.test_envs)
-        assert n_test_envs == 1
+        #assert n_test_envs == 1
         summaries = collections.defaultdict(float)
         # for key order
         summaries["test_in"] = 0.0
@@ -100,13 +137,14 @@ class Evaluator:
             # env\d_[in|out]
             env_name, inout = name.split("_")
             env_num = int(env_name[3:])
+            is_test = env_num in self.test_envs
 
             skip_eval = self.evalmode == "fast" and inout == "in" and env_num not in self.test_envs
             if skip_eval:
                 continue
 
             is_test = env_num in self.test_envs
-            acc, loss = accuracy(algorithm, loader_kwargs, weights, debug=self.debug)
+            acc, loss = accuracy(algorithm, loader_kwargs, weights, debug=self.debug, dump_scores = self.dump_scores, out_dir = self.out_dir, inout=inout, is_test=is_test)
             accuracies[name] = acc
             losses[name] = loss
 

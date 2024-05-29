@@ -107,6 +107,8 @@ def index_conditional_iterate(skip_condition, iterable, index):
 class SplitIterator:
     def __init__(self, test_envs):
         self.test_envs = test_envs
+        if self.test_envs == 'id':
+            self.test_envs = []
 
     def train(self, iterable, index=False):
         return index_conditional_iterate(lambda idx: idx in self.test_envs, iterable, index)

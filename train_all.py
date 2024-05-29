@@ -53,6 +53,8 @@ def main():
     parser.add_argument("--evaluate", action="store_true", help="Evaluate")
     parser.add_argument("--warmup", action="store_true", help="Warmup")
     parser.add_argument("--full_data", action="store_true", help="Full Data")
+    parser.add_argument("--in_domain", action="store_true", help="In Domain")
+    parser.add_argument("--dump_scores", action="store_true", help="Dump CLIP scores")
     parser.add_argument(
         "--evalmode",
         default="fast",
@@ -151,6 +153,9 @@ def main():
     n_steps = (n_steps // checkpoint_freq) * checkpoint_freq + 1
     logger.info(f"n_steps is updated to {org_n_steps} => {n_steps} for checkpointing")
 
+    if args.dump_scores:
+        hparams.test_batchsize = 1
+
     if not args.test_envs:
         args.test_envs = [[te] for te in range(len(dataset))]
     else:
@@ -158,6 +163,9 @@ def main():
             args.test_envs = [[x] for x in args.test_envs]
         elif isinstance(args.test_envs, int):
             args.test_envs = [[args.test_envs]]
+
+    if args.in_domain:
+        args.test_envs = ['id']
     logger.info(f"Target test envs = {args.test_envs}")
 
     ###########################################################################
@@ -167,18 +175,18 @@ def main():
     results = collections.defaultdict(list)
 
     for test_env in args.test_envs:
-        res, records = train(
-            test_env,
-            args=args,
-            hparams=hparams,
-            n_steps=n_steps,
-            checkpoint_freq=checkpoint_freq,
-            logger=logger,
-            writer=writer,
-        )
-        all_records.append(records)
-        for k, v in res.items():
-            results[k].append(v)
+         res, records = train(
+             test_env,
+             args=args,
+             hparams=hparams,
+             n_steps=n_steps,
+             checkpoint_freq=checkpoint_freq,
+             logger=logger,
+             writer=writer,
+         )
+         all_records.append(records)
+         for k, v in res.items():
+             results[k].append(v)
 
     # log summary table
     logger.info("=== Summary ===")

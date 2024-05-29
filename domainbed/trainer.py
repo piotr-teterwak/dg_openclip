@@ -38,6 +38,8 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
     if target_env is not None:
         testenv_name = f"te_{dataset.environments[target_env]}"
         logger.info(f"Target env = {target_env}")
+    elif args.in_domain:
+        testenv_name = f"te_id"
     else:
         testenv_properties = [str(dataset.environments[i]) for i in test_envs]
         testenv_name = "te_" + "_".join(testenv_properties)
@@ -52,8 +54,8 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
     train_envs = sorted(set(range(n_envs)) - set(test_envs))
     iterator = misc.SplitIterator(test_envs)
     batch_sizes = np.full([n_envs], hparams["batch_size"], dtype=np.int)
-
-    batch_sizes[test_envs] = 0
+    if not args.in_domain:
+        batch_sizes[test_envs] = 0
     batch_sizes = batch_sizes.tolist()
 
     logger.info(f"Batch sizes for each domain: {batch_sizes} (total={sum(batch_sizes)})")
@@ -78,7 +80,6 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
         )
         for (env, env_weights), batch_size in iterator.train(zip(in_splits, batch_sizes))
     ]
-
     # setup eval loaders
     eval_loaders_kwargs = []
     for i, (env, _) in enumerate(in_splits + out_splits + test_splits):
@@ -122,6 +123,8 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
         evalmode=args.evalmode,
         debug=args.debug,
         target_env=target_env,
+        dump_scores = args.dump_scores,
+        out_dir = args.out_dir
     )
 
     swad = None
@@ -170,7 +173,7 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
         #ret["SWAD"] = results["test_in"]
         #ret["SWAD (inD)"] = results[in_key]
         ret = {}
-        ret['OOD'] = results["test_in"]
+        ret['OOD'] =  0.8 * results["test_in"] + 0.2 * results["test_out"]
         ret['ID'] = results["train_out"]
 
         for k, acc in ret.items():
@@ -219,11 +222,14 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
             results.update(summaries)
             results.update(accuracies)
             val_accurracy_keys = [k.split('_')[0] for k in accuracies.keys()]
-            val_accuracy_keys = ['{}_out'.format(k) for k in val_accurracy_keys if str(test_envs[0]) not in k]
-            val_accuracy = np.mean([accuracies[k] for k in val_accuracy_keys])
+            if len(test_envs) > 0:
+                val_accurracy_keys = ['{}_out'.format(k) for k in val_accurracy_keys if str(test_envs[0]) not in k]
+            else:
+                val_accurracy_keys = ['{}_out'.format(k) for k in val_accurracy_keys]
+            val_accurracy = np.mean([accuracies[k] for k in val_accurracy_keys])
             is_best = False
-            if val_accuracy > algorithm.best_val_acc:
-                algorithm.best_val_acc = val_accuracy
+            if val_accurracy > algorithm.best_val_acc:
+                algorithm.best_val_acc = val_accurracy
                 is_best = True
 
             # print
@@ -248,9 +254,12 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
                 ckpt_dir = args.out_dir / "checkpoints"
                 ckpt_dir.mkdir(exist_ok=True)
 
-                test_env_str = ",".join(map(str, test_envs))
+                if args.in_domain:
+                    test_env_str = test_envs
+                else:
+                    test_env_str = ",".join(map(str, test_envs))
                 filename = "TE{}_best.pth".format(test_env_str)
-                if len(test_envs) > 1 and target_env is not None:
+                if not args.in_domain and len(test_envs) > 1 and target_env is not None:
                     train_env_str = ",".join(map(str, train_envs))
                     filename = f"TE{target_env}_TR{train_env_str}_best.pth"
                 path = ckpt_dir / filename
@@ -451,6 +460,8 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
             evalmode=args.evalmode,
             debug=args.debug,
             target_env=target_env,
+            dump_scores = args.dump_scores,
+            out_dir = args.out_dir
         )
         if hparams["swad"]:
             first_stage_converged = swad.is_converged

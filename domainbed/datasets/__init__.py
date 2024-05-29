@@ -64,7 +64,7 @@ def get_dataset(test_envs, args, hparams, algorithm_class=None):
             int(len(env) * args.holdout_fraction),
             misc.seed_hash(args.trial_seed, env_i),
         )
-        if env_i in test_envs:
+        if not args.in_domain and env_i in test_envs:
             in_type = "test"
             out_type = "test"
         else:

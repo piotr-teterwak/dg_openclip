@@ -34,6 +34,13 @@ BLOCKNAMES = {
         "block3": ["transformer.resblocks.6", "transformer.resblocks.7", "transformer.resblocks.8"],
         "block4": ["transformer.resblocks.9", "transformer.resblocks.10", "transformer.resblocks.11"],
     },
+    "clipavit": {  # vit-base
+        "stem": ["conv1"],
+        "block1": ["transformer.resblocks.0", "transformer.resblocks.1", "transformer.resblocks.2","transformer.resblocks.3", "transformer.resblocks.4", "transformer.resblocks.5"],
+        "block2": ["transformer.resblocks.6", "transformer.resblocks.7", "transformer.resblocks.8", "transformer.resblocks.9", "transformer.resblocks.10", "transformer.resblocks.11"],
+        "block3": ["transformer.resblocks.12", "transformer.resblocks.13", "transformer.resblocks.14","transformer.resblocks.15", "transformer.resblocks.16", "transformer.resblocks.17"],
+        "block4": ["transformer.resblocks.18", "transformer.resblocks.19", "transformer.resblocks.20","transformer.resblocks.21", "transformer.resblocks.22", "transformer.resblocks.23"],
+    },
 
     "regnety": {
         "stem": ["stem"],
@@ -92,6 +99,8 @@ class URResNet(torch.nn.Module):
             block_names = BLOCKNAMES["clipvit"]
         elif hparams.model.startswith("openclip_vit"):
             block_names = BLOCKNAMES["openclipvit"]
+        elif hparams.model.startswith("clipa_vit"):
+            block_names = BLOCKNAMES["clipavit"]
         elif hparams.model == "swag_regnety_16gf":
             block_names = BLOCKNAMES["regnety"]
         elif hparams.model.startswith("vit"):

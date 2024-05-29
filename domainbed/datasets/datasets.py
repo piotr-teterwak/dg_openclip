@@ -202,7 +202,7 @@ class MultipleEnvironmentImageFolder(MultipleDomainDataset):
         self.datasets = []
         for environment in environments:
             path = os.path.join(root, environment)
-            env_dataset = ImageFolder(path)
+            env_dataset = ImageFolder(path, allow_empty=True)
 
             self.datasets.append(env_dataset)
 

@@ -14,7 +14,10 @@ def clip_imageencoder(name):
     return imageencoder
 
 def openclip_imageencoder(name):
-    model, _, preprocess = open_clip.create_model_and_transforms(name, device="cpu", pretrained='laion400m_e32')
+    if name == 'ViT-L-14-CLIPA':
+        model, _, preprocess = open_clip.create_model_and_transforms(name, device="cpu", pretrained='datacomp1b')
+    else:
+        model, _, preprocess = open_clip.create_model_and_transforms(name, device="cpu", pretrained='laion400m_e32')
     imageencoder = model.visual
     return imageencoder
 
@@ -90,6 +93,9 @@ def get_backbone(name, preserve_readout, pretrained):
         n_outputs = network.output_dim
     elif name == "openclip_vit-b16":
         network = openclip_imageencoder("ViT-B-16")
+        n_outputs = network.output_dim
+    elif name == "clipa_vit-l14":
+        network = openclip_imageencoder("ViT-L-14-CLIPA")
         n_outputs = network.output_dim
 
     elif name == "swag_regnety_16gf":
