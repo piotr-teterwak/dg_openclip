@@ -55,6 +55,7 @@ def main():
     parser.add_argument("--full_data", action="store_true", help="Full Data")
     parser.add_argument("--in_domain", action="store_true", help="In Domain")
     parser.add_argument("--dump_scores", action="store_true", help="Dump CLIP scores")
+    parser.add_argument("--attn_tune", action="store_true", help="Attention tuning")
     parser.add_argument(
         "--evalmode",
         default="fast",
@@ -77,6 +78,9 @@ def main():
 
     if args.warmup:
         hparams['linear_steps'] = 500
+
+    if args.attn_tune:
+        hparams['attn_tune'] = True
 
     # setup debug
     if args.debug:

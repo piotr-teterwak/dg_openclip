@@ -123,6 +123,13 @@ class URResNet(torch.nn.Module):
         self.hparams = hparams
         self.freeze_bn()
 
+        if self.hparams['attn_tune']:
+            for n,p in self.network.named_parameters():
+                if 'attn' in n:
+                    p.requires_grad = True
+                else:
+                    p.requires_grad = False
+
     def freeze(self, freeze):
         if freeze is not None:
             if freeze == "all":
