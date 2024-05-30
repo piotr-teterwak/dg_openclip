@@ -296,6 +296,16 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
                     break
 
                 swad_algorithm = swa_utils.AveragedModel(algorithm)  # reset
+            if args.auto_lr and step > hparams["linear_steps"]:
+                algorithm.scheduler.step(results["tr_outloss"])
+                algorithm.lr_schedule.append(algorithm.scheduler._last_lr)
+                if len(algorithm.lr_schedule) > 1:
+                    if algorithm.lr_schedule[-1] != algorithm.lr_schedule[-2]:
+                    #if True:
+                        algorithm.lr_schedule_changes += 1
+                    if algorithm.lr_schedule_changes == 3:
+                            break
+
 
         if step % args.tb_freq == 0:
             # add step values only for tb log

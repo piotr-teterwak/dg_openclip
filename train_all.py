@@ -56,6 +56,7 @@ def main():
     parser.add_argument("--in_domain", action="store_true", help="In Domain")
     parser.add_argument("--dump_scores", action="store_true", help="Dump CLIP scores")
     parser.add_argument("--attn_tune", action="store_true", help="Attention tuning")
+    parser.add_argument("--auto_lr", action="store_true", help="Auto LR")
     parser.add_argument("--mpa", action="store_true", help="MPA")
     parser.add_argument(
         "--evalmode",
@@ -84,6 +85,12 @@ def main():
         hparams['attn_tune'] = True
     else:
         hparams['attn_tune'] = False
+
+    if args.auto_lr:
+        hparams['auto_lr'] = True
+    else:
+        hparams['auto_lr'] = False
+
 
     # setup debug
     if args.debug:

@@ -87,6 +87,7 @@ class MIRO(Algorithm):
             linear_parameters.append(p)
         self.ld = hparams.ld
         self.global_iter = 0
+        self.auto_lr = hparams.auto_lr
 
         # build mean/var encoders
         shapes = get_shapes(self.pre_featurizer, self.input_shape)
@@ -117,6 +118,12 @@ class MIRO(Algorithm):
             lr=self.hparams["lr"],
             weight_decay=self.hparams["weight_decay"],
         )
+
+        if self.auto_lr:
+            self.scheduler =  torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', patience = 1)
+            self.lr_schedule = []
+            self.lr_schedule_changes = 0
+
 
 
     def update(self, x, y, **kwargs):
