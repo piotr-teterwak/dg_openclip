@@ -58,6 +58,7 @@ def main():
     parser.add_argument("--attn_tune", action="store_true", help="Attention tuning")
     parser.add_argument("--auto_lr", action="store_true", help="Auto LR")
     parser.add_argument("--mpa", action="store_true", help="MPA")
+    parser.add_argument("--small_bs", action="store_true", help="MPA")
     parser.add_argument(
         "--evalmode",
         default="fast",
@@ -77,6 +78,9 @@ def main():
 
     if args.evaluate:
         hparams['batch_size'] = 1
+
+    if args.small_bs:
+       hparams['batch_size'] = 16
 
     if args.warmup:
         hparams['linear_steps'] = 500
