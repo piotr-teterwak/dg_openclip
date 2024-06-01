@@ -35,8 +35,8 @@ class MPA(SWADBase):
         prt_fn(results, self.avgmodel)
 
         swa_val_acc = results["train_out"]
-        if swa_val_acc > self.swa_max_acc:
-            self.swa_max_acc = swa_val_acc
+        if swa_val_acc > self.swad_max_acc:
+            self.swad_max_acc = swa_val_acc
             self.final_model = copy.deepcopy(self.avgmodel)
 
 
