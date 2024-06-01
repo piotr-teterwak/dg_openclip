@@ -55,6 +55,7 @@ def main():
     parser.add_argument("--full_data", action="store_true", help="Full Data")
     parser.add_argument("--in_domain", action="store_true", help="In Domain")
     parser.add_argument("--dump_scores", action="store_true", help="Dump CLIP scores")
+    parser.add_argument("--dump_similarities", action="store_true", help="Dump CLIP scores")
     parser.add_argument("--attn_tune", action="store_true", help="Attention tuning")
     parser.add_argument("--auto_lr", action="store_true", help="Auto LR")
     parser.add_argument("--mpa", action="store_true", help="MPA")
@@ -173,6 +174,10 @@ def main():
 
     if args.dump_scores:
         hparams.test_batchsize = 1
+
+    if args.dump_similarities:
+        hparams.test_batchsize = 1
+
 
     if not args.test_envs:
         args.test_envs = [[te] for te in range(len(dataset))]

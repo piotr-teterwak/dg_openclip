@@ -1,4 +1,5 @@
 import open_clip
+import clip
 import os
 import numpy as np
 import collections
@@ -6,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from domainbed.lib.fast_data_loader import FastDataLoader
+from clip_retrieval.clip_client import ClipClient, Modality
 
 if torch.cuda.is_available():
     device = "cuda"
@@ -13,7 +15,7 @@ else:
     device = "cpu"
 
 
-def accuracy_from_loader(algorithm, loader, weights, debug=False, dump_scores=False, out_dir = None, inout=None, is_test=None):
+def accuracy_from_loader(algorithm, loader, weights, debug=False, dump_scores=False, dump_similarities=False, out_dir = None, inout=None, is_test=None):
     correct = 0
     total = 0
     losssum = 0.0
@@ -22,12 +24,18 @@ def accuracy_from_loader(algorithm, loader, weights, debug=False, dump_scores=Fa
     algorithm.eval()
 
     dump_scores = dump_scores and is_test
+    dump_similarities = dump_similarities and is_test
 
     if dump_scores:
         clip_scorer, _, _ = open_clip.create_model_and_transforms('ViT-B-16', pretrained='laion400m_e32')
         clip_scorer = clip_scorer.cuda()
         tokenizer = open_clip.get_tokenizer('ViT-B-16')
         similarity_clip_histogram = []
+    if dump_similarities:
+        openai_clip, _ = clip.load("ViT-B/32", device=device)
+        client = ClipClient(url="http://192.168.17.185:1234/knn-service", indice_name="laion", deduplicate=False,aesthetic_weight=0.0,use_safety_model=False,use_violence_detector=False)
+        num_steps = 0
+        similarity_img_histogram = []
 
     for i, batch in enumerate(loader):
         x = batch["x"].to(device)
@@ -42,6 +50,9 @@ def accuracy_from_loader(algorithm, loader, weights, debug=False, dump_scores=Fa
                  visual_feats = F.normalize(visual_feats, dim=-1)
                  txt_feats = F.normalize(txt_feats, dim=-1)
                  similarity = visual_feats @ txt_feats.T
+
+
+
 
         with torch.no_grad():
             logits = algorithm.predict(x)
@@ -69,6 +80,21 @@ def accuracy_from_loader(algorithm, loader, weights, debug=False, dump_scores=Fa
         if dump_scores:
             similarity_clip_histogram.append((similarity.item(),is_correct))
 
+        if dump_similarities:
+                num_steps += 1
+                if num_steps > 150:
+                    break
+                with torch.no_grad():
+                     image_features = openai_clip.encode_image(x)
+                     image_features = F.normalize(image_features, dim=-1)
+                     query_results = client.query(embedding_input=image_features.cpu().numpy().tolist()[0])
+                     try:
+                        similarity = query_results[0]['similarity']
+                        similarity_img_histogram.append((similarity,is_correct))
+                     except:
+                         pass
+
+
     algorithm.train()
 
     acc = correct / total
@@ -80,6 +106,15 @@ def accuracy_from_loader(algorithm, loader, weights, debug=False, dump_scores=Fa
         path = os.path.join(data_path, data_domain_path + '_' + inout)
         os.makedirs(data_path, exist_ok=True)
         np.save(path, similarity_clip_histogram)
+
+    if dump_similarities:
+        data_domain_path = loader._infinite_iterator._dataset.underlying_dataset.root.split('/')[-1]
+
+        data_path = os.path.join(out_dir, 'similarity_imgh_np')
+        path = os.path.join(data_path, data_domain_path + '_' + inout)
+        os.makedirs(data_path, exist_ok=True)
+        np.save(path, similarity_img_histogram)
+
 
     return acc, loss
 
@@ -97,7 +132,7 @@ def accuracy(algorithm, loader_kwargs, weights, **kwargs):
 class Evaluator:
     def __init__(
         self, test_envs, eval_meta, n_envs, logger, evalmode="fast", debug=False, target_env=None
-    , dump_scores=False, out_dir = None):
+    , dump_scores=False, dump_similarities=False, out_dir = None):
         all_envs = list(range(n_envs))
         train_envs = sorted(set(all_envs) - set(test_envs))
         self.test_envs = test_envs
@@ -110,6 +145,7 @@ class Evaluator:
         self.evalmode = evalmode
         self.debug = debug
         self.dump_scores = dump_scores
+        self.dump_similarities = dump_similarities
         self.out_dir = out_dir
 
         if target_env is not None:
@@ -144,7 +180,7 @@ class Evaluator:
                 continue
 
             is_test = env_num in self.test_envs
-            acc, loss = accuracy(algorithm, loader_kwargs, weights, debug=self.debug, dump_scores = self.dump_scores, out_dir = self.out_dir, inout=inout, is_test=is_test)
+            acc, loss = accuracy(algorithm, loader_kwargs, weights, debug=self.debug, dump_scores = self.dump_scores, dump_similarities = self.dump_similarities, out_dir = self.out_dir, inout=inout, is_test=is_test)
             accuracies[name] = acc
             losses[name] = loss
 

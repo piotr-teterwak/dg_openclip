@@ -124,6 +124,7 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
         debug=args.debug,
         target_env=target_env,
         dump_scores = args.dump_scores,
+        dump_similarities = args.dump_similarities,
         out_dir = args.out_dir
     )
 
@@ -142,10 +143,10 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
 
     if args.evaluate:
 
-        checkpoint = torch.load(args.resume_path)
-        if swad:
-            algorithm = swa_utils.AveragedModel(algorithm)
-        algorithm.load_state_dict(checkpoint['model_dict'])
+        #checkpoint = torch.load(args.resume_path)
+        #if swad:
+        #    algorithm = swa_utils.AveragedModel(algorithm)
+        #algorithm.load_state_dict(checkpoint['model_dict'])
         #in_key = "train_out"
         #tr_val_best_indomain = records.argmax("train_out")[in_key]
 
@@ -474,6 +475,7 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
             debug=args.debug,
             target_env=target_env,
             dump_scores = args.dump_scores,
+            dump_similarities = args.dump_similarities,
             out_dir = args.out_dir
         )
         if hparams["swad"]:
