@@ -143,10 +143,10 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
 
     if args.evaluate:
 
-        #checkpoint = torch.load(args.resume_path)
-        #if swad:
-        #    algorithm = swa_utils.AveragedModel(algorithm)
-        #algorithm.load_state_dict(checkpoint['model_dict'])
+        checkpoint = torch.load(args.resume_path)
+        if swad:
+            algorithm = swa_utils.AveragedModel(algorithm)
+        algorithm.load_state_dict(checkpoint['model_dict'])
         #in_key = "train_out"
         #tr_val_best_indomain = records.argmax("train_out")[in_key]
 
@@ -217,80 +217,87 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
                 results[key] = np.mean(val)
 
             eval_start_time = time.time()
-            accuracies, summaries = evaluator.evaluate(algorithm)
-            results["eval_time"] = time.time() - eval_start_time
+            if not args.mpa:
+                 accuracies, summaries = evaluator.evaluate(algorithm)
+                 results["eval_time"] = time.time() - eval_start_time
 
-            # results = (epochs, loss, step, step_time)
-            results_keys = list(summaries.keys()) + sorted(accuracies.keys()) + list(results.keys())
-            # merge results
-            results.update(summaries)
-            results.update(accuracies)
-            val_accurracy_keys = [k.split('_')[0] for k in accuracies.keys()]
-            if len(test_envs) > 0:
-                val_accurracy_keys = ['{}_out'.format(k) for k in val_accurracy_keys if str(test_envs[0]) not in k]
-            else:
-                val_accurracy_keys = ['{}_out'.format(k) for k in val_accurracy_keys]
-            val_accurracy = np.mean([accuracies[k] for k in val_accurracy_keys])
-            is_best = False
-            if val_accurracy > algorithm.best_val_acc:
-                algorithm.best_val_acc = val_accurracy
-                is_best = True
+                 # results = (epochs, loss, step, step_time)
+                 results_keys = list(summaries.keys()) + sorted(accuracies.keys()) + list(results.keys())
+                 # merge results
+                 results.update(summaries)
+                 results.update(accuracies)
+                 val_accurracy_keys = [k.split('_')[0] for k in accuracies.keys()]
+                 if len(test_envs) > 0:
+                     val_accurracy_keys = ['{}_out'.format(k) for k in val_accurracy_keys if str(test_envs[0]) not in k]
+                 else:
+                     val_accurracy_keys = ['{}_out'.format(k) for k in val_accurracy_keys]
+                 val_accurracy = np.mean([accuracies[k] for k in val_accurracy_keys])
+                 is_best = False
+                 if val_accurracy > algorithm.best_val_acc:
+                     algorithm.best_val_acc = val_accurracy
+                     is_best = True
 
-            # print
-            if results_keys != last_results_keys:
-                logger.info(misc.to_row(results_keys))
-                last_results_keys = results_keys
-            logger.info(misc.to_row([results[key] for key in results_keys]))
-            records.append(copy.deepcopy(results))
+                 # print
+                 if results_keys != last_results_keys:
+                     logger.info(misc.to_row(results_keys))
+                     last_results_keys = results_keys
+                 logger.info(misc.to_row([results[key] for key in results_keys]))
+                 records.append(copy.deepcopy(results))
 
-            # update results to record
-            results.update({"hparams": dict(hparams), "args": vars(args)})
+                 # update results to record
+                 results.update({"hparams": dict(hparams), "args": vars(args)})
 
-            with open(epochs_path, "a") as f:
-                f.write(json.dumps(results, sort_keys=True, default=json_handler) + "\n")
+                 with open(epochs_path, "a") as f:
+                     f.write(json.dumps(results, sort_keys=True, default=json_handler) + "\n")
 
-            checkpoint_vals = collections.defaultdict(lambda: [])
+                 checkpoint_vals = collections.defaultdict(lambda: [])
 
-            writer.add_scalars_with_prefix(summaries, step, f"{testenv_name}/summary/")
-            writer.add_scalars_with_prefix(accuracies, step, f"{testenv_name}/all/")
+                 writer.add_scalars_with_prefix(summaries, step, f"{testenv_name}/summary/")
+                 writer.add_scalars_with_prefix(accuracies, step, f"{testenv_name}/all/")
 
-            if is_best:
-                ckpt_dir = args.out_dir / "checkpoints"
-                ckpt_dir.mkdir(exist_ok=True)
+                 if is_best:
+                     ckpt_dir = args.out_dir / "checkpoints"
+                     ckpt_dir.mkdir(exist_ok=True)
 
-                if args.in_domain:
-                    test_env_str = test_envs
-                else:
-                    test_env_str = ",".join(map(str, test_envs))
-                filename = "TE{}_best.pth".format(test_env_str)
-                if not args.in_domain and len(test_envs) > 1 and target_env is not None:
-                    train_env_str = ",".join(map(str, train_envs))
-                    filename = f"TE{target_env}_TR{train_env_str}_best.pth"
-                path = ckpt_dir / filename
+                     if args.in_domain:
+                         test_env_str = test_envs
+                     else:
+                         test_env_str = ",".join(map(str, test_envs))
+                     filename = "TE{}_best.pth".format(test_env_str)
+                     if not args.in_domain and len(test_envs) > 1 and target_env is not None:
+                         train_env_str = ",".join(map(str, train_envs))
+                         filename = f"TE{target_env}_TR{train_env_str}_best.pth"
+                     path = ckpt_dir / filename
 
 
-                save_dict = {
-                    "args": vars(args),
-                    "model_hparams": dict(hparams),
-                    "test_envs": test_envs,
-                    "model_dict": algorithm.cpu().state_dict(),
-                }
-                algorithm.cuda()
-                if not args.debug:
-                    torch.save(save_dict, path)
-                else:
-                    logger.debug("DEBUG Mode -> no save (org path: %s)" % path)
+                     save_dict = {
+                         "args": vars(args),
+                         "model_hparams": dict(hparams),
+                         "test_envs": test_envs,
+                         "model_dict": algorithm.cpu().state_dict(),
+                     }
+                     algorithm.cuda()
+                     if not args.debug:
+                         torch.save(save_dict, path)
+                     else:
+                         logger.debug("DEBUG Mode -> no save (org path: %s)" % path)
 
-            # swad
+                 # swad
             if swad and step > hparams["linear_steps"]:
-                def prt_results_fn(results, avgmodel):
+                def prt_results_fn(results, avgmodel, results_keys):
                     step_str = f" [{avgmodel.start_step}-{avgmodel.end_step}]"
                     row = misc.to_row([results[key] for key in results_keys if key in results])
+                    logger.info(misc.to_row(results_keys))
                     logger.info(row + step_str)
+                if args.mpa:
+                     swad.update_and_evaluate(
+                        swad_algorithm, None, None, prt_results_fn
+                    )
 
-                swad.update_and_evaluate(
-                    swad_algorithm, results["train_out"], results["tr_outloss"], prt_results_fn
-                )
+                else:
+                    swad.update_and_evaluate(
+                        swad_algorithm, results["train_out"], results["tr_outloss"], prt_results_fn
+                    )
 
                 if hasattr(swad, "dead_valley") and swad.dead_valley:
                     logger.info("SWAD valley is dead -> early stop !")
@@ -313,24 +320,26 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
             writer.add_scalars_with_prefix(step_vals, step, f"{testenv_name}/summary/")
 
     # find best
-    logger.info("---")
-    records = Q(records)
-    te_val_best = records.argmax("test_out")["test_in"]
-    tr_val_best = records.argmax("train_out")["test_in"]
-    last = records[-1]["test_in"]
+    ret = {}
+    if not args.mpa:
+         logger.info("---")
+         records = Q(records)
+         te_val_best = records.argmax("test_out")["test_in"]
+         tr_val_best = records.argmax("train_out")["test_in"]
+         last = records[-1]["test_in"]
 
-    in_key = "train_out"
-    tr_val_best_indomain = records.argmax("train_out")[in_key]
-    last_indomain = records[-1][in_key]
+         in_key = "train_out"
+         tr_val_best_indomain = records.argmax("train_out")[in_key]
+         last_indomain = records[-1][in_key]
 
-    # NOTE for clearity, report only training-domain validation results.
-    ret = {
-        #  "test-domain validation": te_val_best,
-        "training-domain validation": tr_val_best,
-        #  "last": last,
-        #  "last (inD)": last_indomain,
-        #  "training-domain validation (inD)": tr_val_best_indomain,
-    }
+         # NOTE for clearity, report only training-domain validation results.
+         ret = {
+             #  "test-domain validation": te_val_best,
+             "training-domain validation": tr_val_best,
+             #  "last": last,
+             #  "last (inD)": last_indomain,
+             #  "training-domain validation (inD)": tr_val_best_indomain,
+         }
 
     # Evaluate SWAD
     if swad:
@@ -343,6 +352,7 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
         logger.warning("Evaluate SWAD ...")
         accuracies, summaries = evaluator.evaluate(swad_algorithm)
         results = {**summaries, **accuracies}
+        results_keys = results.keys()
         start = swad_algorithm.start_step
         end = swad_algorithm.end_step
         step_str = f" [{start}-{end}]  (N={swad_algorithm.n_averaged})"
@@ -350,7 +360,7 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
         logger.info(row)
 
         ret["SWAD"] = results["test_in"]
-        ret["SWAD (inD)"] = results[in_key]
+        ret["SWAD (inD)"] = results["train_out"]
 
         ckpt_dir = args.out_dir / "checkpoints"
         ckpt_dir.mkdir(exist_ok=True)
@@ -370,9 +380,8 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
             "model_dict": swad_algorithm.cpu().state_dict(),
         }
         torch.save(save_dict, path)
-
     for k, acc in ret.items():
-        logger.info(f"{k} = {acc:.3%}")
+             logger.info(f"{k} = {acc:.3%}")
 
 
 
@@ -517,68 +526,70 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
                     "step": step,
                     "epoch": step / steps_per_epoch,
                 }
+                logger.info(misc.to_row(results.keys()))
+                logger.info(misc.to_row([v for v in  results.values()]))
 
-                for key, val in checkpoint_vals.items():
-                    results[key] = np.mean(val)
+               # for key, val in checkpoint_vals.items():
+               #     results[key] = np.mean(val)
 
-                eval_start_time = time.time()
-                accuracies, summaries = evaluator.evaluate(algorithm)
-                results["eval_time"] = time.time() - eval_start_time
+               # eval_start_time = time.time()
+               # accuracies, summaries = evaluator.evaluate(algorithm)
+               # results["eval_time"] = time.time() - eval_start_time
 
-                # results = (epochs, loss, step, step_time)
-                results_keys = list(summaries.keys()) + sorted(accuracies.keys()) + list(results.keys())
-                # merge results
-                results.update(summaries)
-                results.update(accuracies)
-                val_accurracy_keys = [k.split('_')[0] for k in accuracies.keys()]
-                val_accuracy_keys = ['{}_out'.format(k) for k in val_accurracy_keys if str(test_envs[0]) not in k]
-                val_accuracy = np.mean([accuracies[k] for k in val_accuracy_keys])
-                is_best = False
-                if val_accuracy > algorithm.best_val_acc:
-                    algorithm.best_val_acc = val_accuracy
-                    is_best = True
+               # # results = (epochs, loss, step, step_time)
+               # results_keys = list(summaries.keys()) + sorted(accuracies.keys()) + list(results.keys())
+               # # merge results
+               # results.update(summaries)
+               # results.update(accuracies)
+               # val_accurracy_keys = [k.split('_')[0] for k in accuracies.keys()]
+               # val_accuracy_keys = ['{}_out'.format(k) for k in val_accurracy_keys if str(test_envs[0]) not in k]
+               # val_accuracy = np.mean([accuracies[k] for k in val_accuracy_keys])
+               # is_best = False
+               # if val_accuracy > algorithm.best_val_acc:
+               #     algorithm.best_val_acc = val_accuracy
+               #     is_best = True
 
-                # print
-                if results_keys != last_results_keys:
-                    logger.info(misc.to_row(results_keys))
-                    last_results_keys = results_keys
-                logger.info(misc.to_row([results[key] for key in results_keys]))
-                records.append(copy.deepcopy(results))
+               # # print
+               # if results_keys != last_results_keys:
+               #     logger.info(misc.to_row(results_keys))
+               #     last_results_keys = results_keys
+               # logger.info(misc.to_row([results[key] for key in results_keys]))
+               # records.append(copy.deepcopy(results))
 
-                # update results to record
-                results.update({"hparams": dict(hparams), "args": vars(args)})
+               # # update results to record
+               # results.update({"hparams": dict(hparams), "args": vars(args)})
 
-                with open(epochs_path, "a") as f:
-                    f.write(json.dumps(results, sort_keys=True, default=json_handler) + "\n")
+               # with open(epochs_path, "a") as f:
+               #     f.write(json.dumps(results, sort_keys=True, default=json_handler) + "\n")
 
-                checkpoint_vals = collections.defaultdict(lambda: [])
+               # checkpoint_vals = collections.defaultdict(lambda: [])
 
-                writer.add_scalars_with_prefix(summaries, step, f"{testenv_name}/summary/")
-                writer.add_scalars_with_prefix(accuracies, step, f"{testenv_name}/all/")
+               # writer.add_scalars_with_prefix(summaries, step, f"{testenv_name}/summary/")
+               # writer.add_scalars_with_prefix(accuracies, step, f"{testenv_name}/all/")
 
-                if is_best:
-                    ckpt_dir = args.out_dir / "checkpoints"
-                    ckpt_dir.mkdir(exist_ok=True)
+               # if is_best:
+               #     ckpt_dir = args.out_dir / "checkpoints"
+               #     ckpt_dir.mkdir(exist_ok=True)
 
-                    test_env_str = ",".join(map(str, test_envs))
-                    filename = "TE{}_best.pth".format(test_env_str)
-                    if len(test_envs) > 1 and target_env is not None:
-                        train_env_str = ",".join(map(str, train_envs))
-                        filename = f"TE{target_env}_TR{train_env_str}_best.pth"
-                    path = ckpt_dir / filename
+               #     test_env_str = ",".join(map(str, test_envs))
+               #     filename = "TE{}_best.pth".format(test_env_str)
+               #     if len(test_envs) > 1 and target_env is not None:
+               #         train_env_str = ",".join(map(str, train_envs))
+               #         filename = f"TE{target_env}_TR{train_env_str}_best.pth"
+               #     path = ckpt_dir / filename
 
 
-                    save_dict = {
-                        "args": vars(args),
-                        "model_hparams": dict(hparams),
-                        "test_envs": test_envs,
-                        "model_dict": algorithm.cpu().state_dict(),
-                    }
-                    algorithm.cuda()
-                    if not args.debug:
-                        torch.save(save_dict, path)
-                    else:
-                        logger.debug("DEBUG Mode -> no save (org path: %s)" % path)
+               #     save_dict = {
+               #         "args": vars(args),
+               #         "model_hparams": dict(hparams),
+               #         "test_envs": test_envs,
+               #         "model_dict": algorithm.cpu().state_dict(),
+               #     }
+               #     algorithm.cuda()
+               #     if not args.debug:
+               #         torch.save(save_dict, path)
+               #     else:
+               #         logger.debug("DEBUG Mode -> no save (org path: %s)" % path)
 
                 # swad
                 if swad and step > hparams["linear_steps"]:
@@ -602,21 +613,21 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
                 writer.add_scalars_with_prefix(step_vals, step, f"{testenv_name}/summary/")
 
         # find best
-        logger.info("---")
-        records = Q(records)
-        last = records[-1]["test_in"]
+       # logger.info("---")
+       # records = Q(records)
+       # last = records[-1]["test_in"]
 
-        in_key = "train_out"
-        last_indomain = records[-1][in_key]
+       # in_key = "train_out"
+       # last_indomain = records[-1][in_key]
 
         # NOTE for clearity, report only training-domain validation results.
-        ret = {
+       # ret = {
             #  "test-domain validation": te_val_best,
             #"training-domain validation": tr_val_best,
-              "last": last,
+      #        "last": last,
             #  "last (inD)": last_indomain,
             #  "training-domain validation (inD)": tr_val_best_indomain,
-        }
+       # }
 
         # Evaluate SWAD
         if swad:
@@ -636,7 +647,7 @@ def train(test_envs, args, hparams, n_steps, checkpoint_freq, logger, writer, ta
             logger.info(row)
 
             ret["SWAD"] = results["test_in"]
-            ret["SWAD (inD)"] = results[in_key]
+            ret["SWAD (inD)"] = results["train_out"]
             state_dict = swad_algorithm.cpu().state_dict()
         else:
             state_dict = algorithm.cpu().state_dict()

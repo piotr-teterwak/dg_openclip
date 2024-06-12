@@ -17,6 +17,7 @@ class MPA(SWADBase):
     def __init__(self, evaluator,  **kwargs):
         self.start_step = 600
         self.swad_max_acc = 0.0
+        self.is_converged = True
         self.avgmodel = None
         self.final_model = None
         self.evaluator = evaluator
@@ -32,7 +33,8 @@ class MPA(SWADBase):
         # evaluate
         accuracies, summaries = self.evaluator.evaluate(self.avgmodel)
         results = {**summaries, **accuracies}
-        prt_fn(results, self.avgmodel)
+        results_keys = (list(summaries.keys()) + sorted(accuracies.keys()))
+        prt_fn(results, self.avgmodel, results_keys)
 
         swa_val_acc = results["train_out"]
         if swa_val_acc > self.swad_max_acc:

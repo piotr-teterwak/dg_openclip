@@ -41,6 +41,7 @@ def accuracy_from_loader(algorithm, loader, weights, debug=False, dump_scores=Fa
         x = batch["x"].to(device)
         y = batch["y"].to(device)
 
+
         if dump_scores:
             with torch.no_grad():
                  classname = 'A photo of {}.'.format(loader._infinite_iterator._dataset.underlying_dataset.classes[y])
